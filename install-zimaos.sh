@@ -5,8 +5,8 @@
 set -Eeuo pipefail
 
 REPOSITORY="dejanrepic-lab/grampsweb-bcs"
-BRANCH="main"
-RAW_BASE="https://raw.githubusercontent.com/${REPOSITORY}/${BRANCH}"
+SOURCE_REF="${GRAMPSWEB_BCS_REF:-main}"
+RAW_BASE="https://raw.githubusercontent.com/${REPOSITORY}/${SOURCE_REF}"
 INSTALL_DIR="/usr/local/lib/grampsweb-bcs"
 SYSTEMD_DIR="/etc/systemd/system"
 CONFIG_FILE="/etc/default/grampsweb-bcs"
