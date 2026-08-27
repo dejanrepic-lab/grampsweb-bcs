@@ -7,9 +7,9 @@ set -Eeuo pipefail
 REPOSITORY="dejanrepic-lab/grampsweb-bcs"
 SOURCE_REF="${GRAMPSWEB_BCS_REF:-main}"
 RAW_BASE="https://raw.githubusercontent.com/${REPOSITORY}/${SOURCE_REF}"
-INSTALL_DIR="/usr/local/lib/grampsweb-bcs"
+INSTALL_DIR="/DATA/AppData/grampsweb/grampsweb-bcs-updater"
 SYSTEMD_DIR="/etc/systemd/system"
-CONFIG_FILE="/etc/default/grampsweb-bcs"
+CONFIG_FILE="${INSTALL_DIR}/grampsweb-bcs.env"
 REMOTE_IMAGE="ghcr.io/dejanrepic-lab/grampsweb-bcs:latest"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -27,7 +27,19 @@ command -v curl >/dev/null 2>&1 || die "Naredba curl nije pronađena."
 command -v docker >/dev/null 2>&1 || die "Docker nije pronađen."
 
 temporary_dir="$(mktemp -d /tmp/grampsweb-bcs-install.XXXXXX)"
-trap 'rm -rf -- "${temporary_dir}"' EXIT
+timer_was_active=false
+
+cleanup() {
+    local exit_code=$?
+    rm -rf -- "${temporary_dir}"
+
+    if (( exit_code != 0 )) && [[ "${timer_was_active}" == true ]]; then
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        systemctl start grampsweb-bcs-update.timer >/dev/null 2>&1 || true
+    fi
+}
+
+trap cleanup EXIT
 
 install_project_file() {
     local source_name="$1"
@@ -88,7 +100,10 @@ compose_dir="$(dirname "${compose_file}")"
 
 log "Pronađen Gramps Web stack: ${compose_dir}"
 
-systemctl disable --now grampsweb-bcs-update.timer >/dev/null 2>&1 || true
+if systemctl is-active --quiet grampsweb-bcs-update.timer; then
+    timer_was_active=true
+fi
+systemctl stop grampsweb-bcs-update.timer >/dev/null 2>&1 || true
 
 install_project_file update-grampsweb-bcs.sh "${INSTALL_DIR}/update-grampsweb-bcs.sh" 0755
 install_project_file grampsweb-bcs-update.service "${SYSTEMD_DIR}/grampsweb-bcs-update.service" 0644
