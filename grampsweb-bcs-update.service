@@ -1,0 +1,12 @@
+[Unit]
+Description=Sigurno ažuriranje Gramps Weba sa BCS zakrpom
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/grampsweb-bcs
+ExecStart=/usr/local/lib/grampsweb-bcs/update-grampsweb-bcs.sh
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=idle

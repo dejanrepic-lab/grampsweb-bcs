@@ -1,0 +1,11 @@
+[Unit]
+Description=Sedmična provjera Gramps Web ažuriranja
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30:00
+Persistent=true
+RandomizedDelaySec=20min
+Unit=grampsweb-bcs-update.service
+
+[Install]
+WantedBy=timers.target
