@@ -82,8 +82,12 @@ sudo systemctl list-timers grampsweb-bcs-update.timer --no-pager
 Provjera same slike bez mijenjanja aktivnih kontejnera:
 
 ```bash
-sudo /usr/local/lib/grampsweb-bcs/update-grampsweb-bcs.sh --check-only
+sudo /DATA/AppData/grampsweb/grampsweb-bcs-updater/update-grampsweb-bcs.sh --check-only
 ```
+
+Updater i njegova mala konfiguracija namjerno se čuvaju u
+`/DATA/AppData/grampsweb/grampsweb-bcs-updater`, jer je sistemski dio ZimaOS-a
+samo za čitanje.
 
 ## Ručna Docker upotreba
 
