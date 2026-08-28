@@ -18,7 +18,7 @@ LABEL io.github.dejanrepic-lab.grampsweb-bcs.upstream-version="${UPSTREAM_VERSIO
 COPY patch_rel_hr.py patch_sr_latin.py verify_image.py /tmp/grampsweb-bcs/
 RUN python3 /tmp/grampsweb-bcs/patch_rel_hr.py \
     && python3 /tmp/grampsweb-bcs/patch_sr_latin.py \
-    && python3 -c 'import re; value = "${UPSTREAM_VERSION}"; assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?", value), value' \
+    && UPSTREAM_VERSION="${UPSTREAM_VERSION}" python3 -c 'import os, re; value = os.environ["UPSTREAM_VERSION"]; assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?", value), value' \
     && install -D -m 0644 /dev/null /usr/local/lib/grampsweb-bcs/upstream-version \
     && printf '%s\n' "${UPSTREAM_VERSION}" > /usr/local/lib/grampsweb-bcs/upstream-version \
     && python3 /tmp/grampsweb-bcs/verify_image.py \
