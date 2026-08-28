@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gettext
 import json
+import re
 from pathlib import Path
 
 import gramps.plugins.rel.rel_hr as relationship_module
@@ -42,6 +43,13 @@ expected_frontend = {
 for key, expected in expected_frontend.items():
     assert frontend.get(key) == expected, (key, frontend.get(key))
 
+version_path = Path("/usr/local/lib/grampsweb-bcs/upstream-version")
+upstream_version = version_path.read_text(encoding="utf-8").strip()
+assert re.fullmatch(
+    r"[0-9]+\.[0-9]+\.[0-9]+(?:[.-][0-9A-Za-z.-]+)?",
+    upstream_version,
+), upstream_version
+
 catalogs = list(Path("/venv").rglob("sr/LC_MESSAGES/gramps.mo"))
 assert catalogs, "Nije pronađen serverski Gramps sr katalog"
 
@@ -56,4 +64,7 @@ for catalog_path in catalogs:
                 if isinstance(item, str):
                     assert not contains_cyrillic(item), catalog_path
 
-print("BCS provjera odnosa i srpske latinice: uspješna")
+print(
+    f"BCS provjera odnosa i srpske latinice: uspješna "
+    f"(Gramps Web {upstream_version})"
+)
