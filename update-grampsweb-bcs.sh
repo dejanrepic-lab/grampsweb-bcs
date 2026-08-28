@@ -6,6 +6,7 @@ set -Eeuo pipefail
 
 REMOTE_IMAGE="ghcr.io/dejanrepic-lab/grampsweb-bcs:latest"
 ROLLBACK_IMAGE="grampsweb-bcs:rollback"
+VERSION_LABEL="io.github.dejanrepic-lab.grampsweb-bcs.upstream-version"
 COMPOSE_DIR="${GRAMPSWEB_COMPOSE_DIR:-/var/lib/casaos/apps/heartwarming_matthias}"
 DOCKER_CONFIG_DIR="/tmp/grampsweb-bcs-docker-config"
 LOCK_FILE="/run/lock/grampsweb-bcs-update.lock"
@@ -42,6 +43,18 @@ compose() {
     (cd "${COMPOSE_DIR}" && docker compose "$@")
 }
 
+image_version() {
+    local reference="$1"
+    local value
+    value="$(docker image inspect --format "{{index .Config.Labels \"${VERSION_LABEL}\"}}" "${reference}" 2>/dev/null || true)"
+    [[ "${value}" == "<no value>" ]] && value=""
+    printf '%s\n' "${value}"
+}
+
+valid_version() {
+    [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+}
+
 [[ "${EUID}" -eq 0 ]] || die "Pokreni updater kao root (sudo)."
 command -v docker >/dev/null 2>&1 || die "Docker nije pronađen."
 command -v flock >/dev/null 2>&1 || die "Naredba flock nije pronađena."
@@ -58,23 +71,43 @@ export DOCKER_CONFIG="${DOCKER_CONFIG_DIR}"
 
 running_image_id="$(docker inspect --format '{{.Image}}' grampsweb 2>/dev/null || true)"
 [[ -n "${running_image_id}" ]] || die "Aktivni kontejner grampsweb nije pronađen."
+running_version="$(image_version "${running_image_id}")"
+
+if valid_version "${running_version}"; then
+    log "Trenutno instalirana Gramps Web verzija: ${running_version}."
+else
+    log "Trenutna slika nema zabilježen broj Gramps Web verzije."
+fi
 
 log "Preuzimam posljednju provjerenu Gramps Web BCS sliku."
 docker pull "${REMOTE_IMAGE}"
 remote_image_id="$(docker image inspect --format '{{.Id}}' "${REMOTE_IMAGE}")"
+remote_version="$(image_version "${REMOTE_IMAGE}")"
+valid_version "${remote_version}" || die "Preuzeta BCS slika nema važeću oznaku Gramps Web verzije."
+
+embedded_version="$(docker run --rm --entrypoint cat "${REMOTE_IMAGE}" \
+    /usr/local/lib/grampsweb-bcs/upstream-version)"
+[[ "${embedded_version}" == "${remote_version}" ]] || die "Broj verzije u slici ne odgovara njenoj Docker oznaci."
+log "Posljednja provjerena dostupna Gramps Web verzija: ${remote_version}."
 
 log "Provjeravam BCS odnose i srpsku latinicu u preuzetoj slici."
 docker run --rm --entrypoint python3 "${REMOTE_IMAGE}" \
     /usr/local/lib/grampsweb-bcs/verify_image.py
 
 if [[ "${CHECK_ONLY}" == true ]]; then
-    log "Provjera je uspješna; aktivni kontejneri nisu mijenjani."
+    log "Provjera verzije ${remote_version} je uspješna; aktivni kontejneri nisu mijenjani."
     exit 0
 fi
 
 if [[ "${FORCE_UPDATE}" == false && "${running_image_id}" == "${remote_image_id}" ]]; then
-    log "Već koristiš posljednju BCS sliku; ništa nije mijenjano."
+    log "Već koristiš Gramps Web BCS ${remote_version}; ništa nije mijenjano."
     exit 0
+fi
+
+if valid_version "${running_version}"; then
+    log "Ažuriram Gramps Web sa ${running_version} na ${remote_version}."
+else
+    log "Ažuriram Gramps Web na provjerenu verziju ${remote_version}."
 fi
 
 docker tag "${running_image_id}" "${ROLLBACK_IMAGE}"
@@ -110,7 +143,11 @@ fi
 rollback() {
     local reason="$1"
     log "Nova verzija nije uspješno pokrenuta: ${reason}"
-    log "Vraćam prethodnu Docker sliku."
+    if valid_version "${running_version}"; then
+        log "Vraćam prethodnu Gramps Web verziju ${running_version}."
+    else
+        log "Vraćam prethodnu Docker sliku."
+    fi
     docker tag "${ROLLBACK_IMAGE}" "${REMOTE_IMAGE}"
     compose up -d --force-recreate "${SERVICES[@]}" || true
     die "Ažuriranje je prekinuto; provjeri: journalctl -u grampsweb-bcs-update.service"
@@ -131,7 +168,7 @@ while (( SECONDS < deadline )); do
         active_image_id="$(docker inspect --format '{{.Image}}' grampsweb)"
         [[ "${active_image_id}" == "${remote_image_id}" ]] || rollback "kontejner ne koristi preuzetu BCS sliku"
 
-        log "Ažuriranje je uspješno. Gramps Web je zdrav, a BCS zakrpa je aktivna."
+        log "Ažuriranje na Gramps Web ${remote_version} je uspješno. Gramps Web je zdrav, a BCS zakrpa je aktivna."
         docker image rm "${ROLLBACK_IMAGE}" >/dev/null 2>&1 || true
 
         mapfile -t saved_backups < <(find "${BACKUP_DIR}" -maxdepth 1 -type f -name 'pre-update-*.tar.gz' | sort -r)

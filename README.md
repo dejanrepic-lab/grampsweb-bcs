@@ -15,9 +15,20 @@ Slika se gradi direktno na posljednjoj službenoj slici `ghcr.io/gramps-project/
 
 ```text
 ghcr.io/dejanrepic-lab/grampsweb-bcs:latest
+ghcr.io/dejanrepic-lab/grampsweb-bcs:26.8.1
 ```
 
-GitHub Actions svaki dan provjerava službenu Gramps Web sliku. Nova BCS slika se gradi samo kada se promijeni službena slika ili sadržaj ovog repozitorija. Izgradnja se prekida ako automatska provjera pronađe ćirilicu, nedostajući prevod ili nekompatibilnu zakrpu.
+Oznaka `latest` uvijek pokazuje na posljednju provjerenu stabilnu verziju. Svaka
+objava dobija i oznaku sa stvarnim brojem službene Gramps Web verzije.
+
+GitHub Actions svaki dan provjerava posljednji službeni Gramps Web release i
+upoređuje Docker oznake `latest` i broja verzije. Nova BCS slika se gradi samo
+kada obje službene oznake vode na potpuno istu sliku. Izgradnja se prekida ako
+se oznake ne podudaraju ili ako automatska provjera pronađe ćirilicu,
+nedostajući prevod ili nekompatibilnu zakrpu.
+
+Na stranici svakog GitHub Actions pokretanja odjeljak `Summary` prikazuje
+pronađeni broj Gramps Web verzije i rezultat objavljivanja.
 
 Objavljena slika sadrži SBOM i BuildKit provenance podatke. Workflow koristi samo ugrađeni `GITHUB_TOKEN`, sa minimalnim dozvolama `contents: read` i `packages: write`; nema privatnih ključeva ni ličnih podataka.
 
@@ -67,6 +78,13 @@ Ručna provjera i eventualno ažuriranje:
 sudo systemctl start grampsweb-bcs-update.service
 ```
 
+Ova naredba namjerno ne ispisuje napredak u istom terminalu. Broj trenutno
+instalirane i dostupne verzije vidi se u dnevniku:
+
+```bash
+sudo journalctl -fu grampsweb-bcs-update.service
+```
+
 Posljednjih 100 redova dnevnika:
 
 ```bash
@@ -107,7 +125,9 @@ environment:
 Lokalna izgradnja:
 
 ```bash
-docker build --pull -t grampsweb-bcs:test .
+docker build --pull \
+  --build-arg UPSTREAM_VERSION=26.8.1 \
+  -t grampsweb-bcs:test .
 docker run --rm --entrypoint python3 grampsweb-bcs:test \
   /usr/local/lib/grampsweb-bcs/verify_image.py
 ```
